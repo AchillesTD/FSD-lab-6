@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bookstore</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background-color: #f9f9f9;
+      margin: 20px;
+    }
+
+    h1 {
+      color: #333;
+      text-align: center;
+      margin-bottom: 30px;
+    }
+
+    form {
+      max-width: 600px;
+      margin: 0 auto;
+      background-color: #fff;
+      padding: 20px;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: bold;
+    }
+
+    input {
+      width: 100%;
+      padding: 10px;
+      margin-bottom: 15px;
+      box-sizing: border-box;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+
+    button {
+      background-color: #4caf50;
+      color: #fff;
+      padding: 12px 20px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 30px;
+      background-color: #fff;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    th,
+    td {
+      border: 1px solid #ddd;
+      padding: 15px;
+      text-align: left;
+    }
+
+    th {
+      background-color: #4caf50;
+      color: #fff;
+    }
+
+    .action-buttons button {
+      margin-right: 5px;
+    }
+
+    .error-message {
+      color: #ff0000;
+      font-size: 14px;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+
+<body>
+
+  <h1>Bookstore</h1>
+
+  <form id="addBookForm">
+    <label for="title">Title:</label>
+    <input type="text" id="title" name="title" required>
+
+    <label for="author">Author:</label>
+    <input type="text" id="author" name="author" required>
+    <span class="error-message" id="authorError"></span>
+
+    <label for="genre">Genre:</label>
+    <input type="text" id="genre" name="genre" required>
+
+    <button type="submit">Add Book</button>
+  </form>
+
+  <table id="bookTable">
+    <thead>
+      <tr>
+        <th>Title</th>
+        <th>Author</th>
+        <th>Genre</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const addBookForm = document.getElementById('addBookForm');
+      const authorInput = document.getElementById('author');
+      const authorError = document.getElementById('authorError');
+      const bookTableBody = document.querySelector('#bookTable tbody');
+  
+      function validateAuthor() {
+        const authorValue = authorInput.value;
+        const isValid = /^[a-zA-Z\s]+$/.test(authorValue);
+  
+        if (!isValid) {
+          authorError.textContent = 'Author name can only contain letters and spaces.';
+          return false;
+        } else {
+          authorError.textContent = '';
+          return true;
+        }
+      }
+  
+      addBookForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+  
+        if (!validateAuthor()) {
+          return;
+        }
+  
+        const title = document.getElementById('title').value;
+        const author = authorInput.value;
+        const genre = document.getElementById('genre').value;
+  
+        try {
+          await fetch('http://localhost:3000/books', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              title,
+              author,
+              genre
+            }),
+          });
+  
+          addBookForm.reset();
+          fetchAndRenderBooks();
+        } catch (error) {
+          console.error('Error adding book:', error);
+        }
+      });
+  
+      function createActionButton(bookId) {
+        const deleteButton = document.createElement('button');
+        deleteButton.textContent = 'Delete';
+        deleteButton.addEventListener('click', () => deleteBook(bookId));
+  
+        const actionsContainer = document.createElement('div');
+        actionsContainer.classList.add('action-buttons');
+        actionsContainer.appendChild(deleteButton);
+  
+        return actionsContainer;
+      }
+  
+      function renderBooks(books) {
+        bookTableBody.innerHTML = '';
+  
+        books.forEach(book => {
+          const row = document.createElement('tr');
+          row.innerHTML = `
+            <td>${book.title}</td>
+            <td>${book.author}</td>
+            <td>${book.genre}</td>
+          `;
+  
+          const actionsCell = document.createElement('td');
+          actionsCell.appendChild(createActionButton(book._id));
+  
+          row.appendChild(actionsCell);
+          bookTableBody.appendChild(row);
+        });
+      }
+  
+      async function fetchAndRenderBooks() {
+        try {
+          const response = await fetch('http://localhost:3000/books');
+  
+          if (!response.ok) {
+            throw new Error(`Failed to fetch books. Status: ${response.status}`);
+          }
+  
+          const books = await response.json();
+  
+          if (!Array.isArray(books)) {
+            throw new Error('Invalid response format. Expected an array.');
+          }
+  
+          renderBooks(books);
+        } catch (error) {
+          console.error('Error fetching books:', error);
+        }
+      }
+  
+      function deleteBook(bookId) {
+        fetch(`http://localhost:3000/books/${bookId}`, {
+            method: 'DELETE',
+          })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error(`Failed to delete book. Status: ${response.status}`);
+            }
+  
+            return response.json();
+          })
+          .then(deletedBook => {
+            console.log('Book deleted:', deletedBook);
+            fetchAndRenderBooks();
+          })
+          .catch(error => {
+            console.error('Error deleting book:', error);
+          });
+      }
+  
+      fetchAndRenderBooks();
+    });
+  </script>
+  
+</body>
+
+</html>
